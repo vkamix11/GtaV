@@ -2,196 +2,145 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<title>Mini GTA – Etap 1 (Kolor + Mobile)</title>
+<title>Mini GTA – Etap 1 (OPTIMIZED)</title>
 
 <style>
 html, body {
   margin: 0;
   padding: 0;
-  overflow: hidden;
   width: 100%;
   height: 100%;
-  background: #000;
+  overflow: hidden;
+  background: black;
   touch-action: none;
 }
-canvas {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
+canvas { width: 100%; height: 100%; display: block; }
 </style>
 
 <script src="https://cdn.babylonjs.com/babylon.js"></script>
 </head>
 <body>
-
 <canvas id="game"></canvas>
 
 <script>
 /* =============================
-   SILNIK
+   DETEKCJA MOBILE
+============================= */
+const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+
+/* =============================
+   SILNIK – OPTYMALIZACJA
 ============================= */
 const canvas = document.getElementById("game");
-const engine = new BABYLON.Engine(canvas, true);
+const engine = new BABYLON.Engine(canvas, true, {
+  preserveDrawingBuffer: false,
+  stencil: false,
+  antialias: false
+});
+
+engine.setHardwareScalingLevel(isMobile ? 1.5 : 1);
+
 const scene = new BABYLON.Scene(engine);
+scene.skipPointerMovePicking = true;
+scene.autoClear = true;
 scene.clearColor = new BABYLON.Color3(0.6, 0.8, 1);
 
 /* =============================
-   KAMERA – SPECTATOR
+   KAMERA
 ============================= */
 const camera = new BABYLON.FreeCamera(
-  "camera",
-  new BABYLON.Vector3(0, 80, -150),
+  "cam",
+  new BABYLON.Vector3(0, 60, -120),
   scene
 );
 camera.attachControl(canvas, true);
-camera.speed = 1.5;
-camera.angularSensibility = 4000;
+camera.speed = isMobile ? 1 : 2;
 
 /* =============================
-   ŚWIATŁO
+   ŚWIATŁO (1 JEDYNE)
 ============================= */
-const sun = new BABYLON.DirectionalLight(
-  "sun",
-  new BABYLON.Vector3(-0.3, -1, -0.5),
+const light = new BABYLON.HemisphericLight(
+  "light",
+  new BABYLON.Vector3(0, 1, 0),
   scene
 );
-sun.position = new BABYLON.Vector3(100, 200, 100);
+light.intensity = 0.9;
 
 /* =============================
-   MATERIAŁY (PROCEDURALNE)
+   MATERIAŁY (REUSE)
 ============================= */
-const materials = {
-  road: new BABYLON.StandardMaterial("road", scene),
-  sidewalk: new BABYLON.StandardMaterial("sidewalk", scene),
-  grass: new BABYLON.StandardMaterial("grass", scene)
-};
+const buildingMat = new BABYLON.StandardMaterial("bmat", scene);
+buildingMat.diffuseColor = new BABYLON.Color3(0.6, 0.6, 0.6);
 
-materials.road.diffuseColor = new BABYLON.Color3(0.15, 0.15, 0.15);
-materials.sidewalk.diffuseColor = new BABYLON.Color3(0.6, 0.6, 0.6);
-materials.grass.diffuseColor = new BABYLON.Color3(0.2, 0.6, 0.2);
+const grassMat = new BABYLON.StandardMaterial("gmat", scene);
+grassMat.diffuseColor = new BABYLON.Color3(0.2, 0.6, 0.2);
 
 /* =============================
    PODŁOŻE
 ============================= */
 const ground = BABYLON.MeshBuilder.CreateGround(
   "ground",
-  { width: 4000, height: 4000 },
+  { width: 2000, height: 2000 },
   scene
 );
-ground.material = materials.road;
+ground.material = grassMat;
 
 /* =============================
-   GENERATOR MIASTA
+   MESH BAZOWY (1x)
+============================= */
+const baseBuilding = BABYLON.MeshBuilder.CreateBox(
+  "baseBuilding",
+  { width: 18, depth: 18, height: 1 },
+  scene
+);
+baseBuilding.isVisible = false;
+baseBuilding.material = buildingMat;
+
+/* =============================
+   GENERATOR MIASTA (INSTANCJE)
 ============================= */
 class CityGenerator {
   constructor(scene) {
     this.scene = scene;
     this.block = 30;
-    this.size = 30;
+    this.size = isMobile ? 12 : 25;
   }
 
   generate() {
     for (let x = -this.size; x < this.size; x++) {
       for (let z = -this.size; z < this.size; z++) {
-        const px = x * this.block;
-        const pz = z * this.block;
+        if (Math.random() < 0.25) continue;
 
-        if (Math.random() < 0.2) {
-          this.createPark(px, pz);
-        } else {
-          this.createBuilding(px, pz);
-        }
+        const h = 10 + Math.random() * 80;
+        const b = baseBuilding.createInstance("b");
+
+        b.scaling.y = h;
+        b.position.set(
+          x * this.block,
+          h / 2,
+          z * this.block
+        );
       }
     }
-  }
-
-  createBuilding(x, z) {
-    const height = 20 + Math.random() * 120;
-
-    const building = BABYLON.MeshBuilder.CreateBox(
-      "building",
-      { width: 18, depth: 18, height },
-      this.scene
-    );
-
-    const mat = new BABYLON.StandardMaterial("bmat", this.scene);
-    mat.diffuseColor = new BABYLON.Color3(
-      0.4 + Math.random() * 0.5,
-      0.4 + Math.random() * 0.5,
-      0.4 + Math.random() * 0.5
-    );
-
-    building.material = mat;
-    building.position.set(x, height / 2, z);
-  }
-
-  createPark(x, z) {
-    const park = BABYLON.MeshBuilder.CreateGround(
-      "park",
-      { width: 24, height: 24 },
-      this.scene
-    );
-    park.material = materials.grass;
-    park.position.set(x, 0.02, z);
-
-    for (let i = 0; i < 6; i++) {
-      this.createTree(
-        x + Math.random() * 14 - 7,
-        z + Math.random() * 14 - 7
-      );
-    }
-  }
-
-  createTree(x, z) {
-    const trunk = BABYLON.MeshBuilder.CreateCylinder(
-      "trunk",
-      { height: 5, diameter: 1 },
-      this.scene
-    );
-    trunk.material = new BABYLON.StandardMaterial("t", this.scene);
-    trunk.material.diffuseColor = new BABYLON.Color3(0.4, 0.25, 0.1);
-    trunk.position.set(x, 2.5, z);
-
-    const crown = BABYLON.MeshBuilder.CreateSphere(
-      "crown",
-      { diameter: 5 },
-      this.scene
-    );
-    crown.material = new BABYLON.StandardMaterial("c", this.scene);
-    crown.material.diffuseColor = new BABYLON.Color3(0.1, 0.6, 0.1);
-    crown.position.set(x, 6, z);
   }
 }
 
 new CityGenerator(scene).generate();
 
 /* =============================
-   MOBILE CONTROLS
+   MOBILE TOUCH (LEKKIE)
 ============================= */
-let lastTouch = null;
-
-canvas.addEventListener("touchstart", e => {
-  lastTouch = e.touches;
-});
-
+let lastX, lastY;
 canvas.addEventListener("touchmove", e => {
-  if (!lastTouch) return;
-
   if (e.touches.length === 1) {
-    const dx = e.touches[0].clientX - lastTouch[0].clientX;
-    const dy = e.touches[0].clientY - lastTouch[0].clientY;
-    camera.rotation.y += dx * 0.005;
-    camera.rotation.x += dy * 0.005;
+    const t = e.touches[0];
+    if (lastX !== undefined) {
+      camera.rotation.y += (t.clientX - lastX) * 0.004;
+      camera.rotation.x += (t.clientY - lastY) * 0.004;
+    }
+    lastX = t.clientX;
+    lastY = t.clientY;
   }
-
-  if (e.touches.length === 2) {
-    camera.position.addInPlace(
-      camera.getDirection(BABYLON.Axis.Z).scale(1.2)
-    );
-  }
-
-  lastTouch = e.touches;
 });
 
 /* =============================
@@ -200,6 +149,5 @@ canvas.addEventListener("touchmove", e => {
 engine.runRenderLoop(() => scene.render());
 window.addEventListener("resize", () => engine.resize());
 </script>
-
 </body>
 </html>
