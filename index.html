@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>Mini GTA – Etap 1</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      width: 100%;
+      height: 100%;
+      background: #000;
+    }
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+  </style>
+
+  <!-- Babylon.js CDN -->
+  <script src="https://cdn.babylonjs.com/babylon.js"></script>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<script>
+/* =============================
+   PODSTAWOWY SILNIK
+============================= */
+const canvas = document.getElementById("game");
+const engine = new BABYLON.Engine(canvas, true);
+const scene = new BABYLON.Scene(engine);
+
+/* =============================
+   KAMERA – SPECTATOR
+============================= */
+const camera = new BABYLON.FreeCamera(
+  "spectatorCamera",
+  new BABYLON.Vector3(0, 80, -120),
+  scene
+);
+camera.attachControl(canvas, true);
+camera.speed = 2;
+camera.inertia = 0.7;
+
+/* =============================
+   ŚWIATŁO
+============================= */
+const light = new BABYLON.HemisphericLight(
+  "light",
+  new BABYLON.Vector3(0, 1, 0),
+  scene
+);
+light.intensity = 0.9;
+
+/* =============================
+   PODŁOŻE (CAŁE MIASTO)
+============================= */
+const ground = BABYLON.MeshBuilder.CreateGround(
+  "ground",
+  { width: 3000, height: 3000 },
+  scene
+);
+
+/* =============================
+   GENERATOR MIASTA
+============================= */
+class CityGenerator {
+  constructor(scene) {
+    this.scene = scene;
+    this.blockSize = 25;
+    this.citySize = 25;
+  }
+
+  generate() {
+    for (let x = -this.citySize; x < this.citySize; x++) {
+      for (let z = -this.citySize; z < this.citySize; z++) {
+        const px = x * this.blockSize;
+        const pz = z * this.blockSize;
+
+        if (Math.random() < 0.18) {
+          this.createPark(px, pz);
+        } else {
+          this.createBuilding(px, pz);
+        }
+      }
+    }
+  }
+
+  createBuilding(x, z) {
+    const height = 20 + Math.random() * 120;
+
+    const building = BABYLON.MeshBuilder.CreateBox(
+      "building",
+      { width: 18, depth: 18, height },
+      this.scene
+    );
+
+    building.position.set(x, height / 2, z);
+  }
+
+  createPark(x, z) {
+    const park = BABYLON.MeshBuilder.CreateGround(
+      "park",
+      { width: 22, height: 22 },
+      this.scene
+    );
+    park.position.set(x, 0.02, z);
+
+    for (let i = 0; i < 6; i++) {
+      this.createTree(
+        x + Math.random() * 14 - 7,
+        z + Math.random() * 14 - 7
+      );
+    }
+  }
+
+  createTree(x, z) {
+    const trunk = BABYLON.MeshBuilder.CreateCylinder(
+      "trunk",
+      { height: 5, diameter: 1 },
+      this.scene
+    );
+    trunk.position.set(x, 2.5, z);
+
+    const crown = BABYLON.MeshBuilder.CreateSphere(
+      "crown",
+      { diameter: 5 },
+      this.scene
+    );
+    crown.position.set(x, 6, z);
+  }
+}
+
+/* =============================
+   START GRY
+============================= */
+const city = new CityGenerator(scene);
+city.generate();
+
+engine.runRenderLoop(() => {
+  scene.render();
+});
+
+window.addEventListener("resize", () => {
+  engine.resize();
+});
+</script>
+</body>
+</html>
